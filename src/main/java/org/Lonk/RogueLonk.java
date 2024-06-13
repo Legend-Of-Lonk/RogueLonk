@@ -12,6 +12,8 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Creature;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -35,11 +37,14 @@ public final class RogueLonk extends JavaPlugin {
     public static HashMap<UUID, HashMap<String, Double>> playerStats = new HashMap<>();
     private File itemsFile;
     private FileConfiguration itemsConfig;
+    private File mobFile;
+    private FileConfiguration mobConfig;
 
     @Override
     public void onEnable() {
         // Plugin startup logic
         createItemsConfig();
+        createMobConfig();
         getServer().getPluginManager().registerEvents(new Stats(), this);
         ItemManager.init();
 
@@ -55,6 +60,84 @@ public final class RogueLonk extends JavaPlugin {
     @Override
     public void onDisable() {
         // Plugin shutdown logic
+    }
+
+    public void createMobConfig() {
+        mobFile = new File(getDataFolder(), "mobs.yml");
+        if (!mobFile.exists()) {
+            mobFile.getParentFile().mkdirs();
+            saveResource("mobs.yml", false);
+        }
+
+        mobConfig = new YamlConfiguration();
+        try {
+            mobConfig.load(mobFile);
+        } catch (IOException | InvalidConfigurationException e) {
+            e.printStackTrace();
+        }
+        mobConfig = YamlConfiguration.loadConfiguration(mobFile);
+    }
+    public FileConfiguration getMobConfig() {
+        return this.mobConfig;
+    }
+
+    public void saveMob(String mobID, Creature mob){
+        if(mobConfig.contains(mobID)){
+            Bukkit.getServer().getConsoleSender().sendMessage("§cMob with ID " + mobID + " already exists!");
+            mobConfig.set(mobID, mobID);
+            mobConfig.set(mobID + ".EntityType", mob.getType().toString());
+            mobConfig.set(mobID + ".Name", mob.getCustomName());
+            mobConfig.set(mobID + ".HP", mob.getHealth());
+            mobConfig.set(mobID + ".Dmg", mob.getAttribute(org.bukkit.attribute.Attribute.GENERIC_ATTACK_DAMAGE).getBaseValue());
+            mobConfig.set(mobID + ".Spd", mob.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MOVEMENT_SPEED).getBaseValue());
+            mobConfig.set(mobID + ".Helmet", mob.getEquipment().getHelmet());
+            mobConfig.set(mobID + ".Chestplate", mob.getEquipment().getChestplate());
+            mobConfig.set(mobID + ".Leggings", mob.getEquipment().getLeggings());
+            mobConfig.set(mobID + ".Boots", mob.getEquipment().getBoots());
+            mobConfig.set(mobID + ".MainHand", mob.getEquipment().getItemInMainHand());
+            mobConfig.set(mobID + ".OffHand", mob.getEquipment().getItemInOffHand());
+            PersistentDataContainer pdc = mob.getPersistentDataContainer();
+            for (NamespacedKey key : pdc.getKeys()) {
+                if (pdc.has(key, PersistentDataType.DOUBLE)) {
+                    mobConfig.set(mobID + ".PDCs" + "." + key.getKey(), pdc.get(key, PersistentDataType.DOUBLE));
+                } else if (pdc.has(key, PersistentDataType.STRING)) {
+                    mobConfig.set(mobID + ".PDCs" + "." + key.getKey(), pdc.get(key, PersistentDataType.STRING));
+                } else if (pdc.has(key, PersistentDataType.BOOLEAN)) {
+                    mobConfig.set(mobID + ".PDCs" + "." + key.getKey(), pdc.get(key, PersistentDataType.BOOLEAN));
+                }
+            }
+            return;
+        }
+        mobConfig.set(mobID, mobID);
+        mobConfig.set(mobID + ".EntityType", mob.getType().toString());
+        mobConfig.set(mobID + ".Name", mob.getCustomName());
+        mobConfig.set(mobID + ".HP", mob.getHealth());
+        mobConfig.set(mobID + ".Dmg", mob.getAttribute(org.bukkit.attribute.Attribute.GENERIC_ATTACK_DAMAGE).getBaseValue());
+        mobConfig.set(mobID + ".Spd", mob.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MOVEMENT_SPEED).getBaseValue());
+        mobConfig.set(mobID + ".Helmet", mob.getEquipment().getHelmet());
+        mobConfig.set(mobID + ".Chestplate", mob.getEquipment().getChestplate());
+        mobConfig.set(mobID + ".Leggings", mob.getEquipment().getLeggings());
+        mobConfig.set(mobID + ".Boots", mob.getEquipment().getBoots());
+        mobConfig.set(mobID + ".MainHand", mob.getEquipment().getItemInMainHand());
+        mobConfig.set(mobID + ".OffHand", mob.getEquipment().getItemInOffHand());
+        PersistentDataContainer pdc = mob.getPersistentDataContainer();
+        for (NamespacedKey key : pdc.getKeys()) {
+            if (pdc.has(key, PersistentDataType.DOUBLE)) {
+                mobConfig.set(mobID + ".PDCs" + "." + key.getKey(), pdc.get(key, PersistentDataType.DOUBLE));
+            } else if (pdc.has(key, PersistentDataType.STRING)) {
+                mobConfig.set(mobID + ".PDCs" + "." + key.getKey(), pdc.get(key, PersistentDataType.STRING));
+            } else if (pdc.has(key, PersistentDataType.BOOLEAN)) {
+                mobConfig.set(mobID + ".PDCs" + "." + key.getKey(), pdc.get(key, PersistentDataType.BOOLEAN));
+            }
+        }
+
+
+
+        try {
+            mobConfig.save(mobFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 

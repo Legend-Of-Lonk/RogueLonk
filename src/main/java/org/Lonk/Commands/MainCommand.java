@@ -1,14 +1,12 @@
 package org.Lonk.Commands;
 
 import org.Lonk.Items.ItemCreator;
-import org.Lonk.MobManager.MobCreator;
 import org.Lonk.RogueLonk;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.entity.Creature;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -74,27 +72,15 @@ public class MainCommand implements CommandExecutor, TabCompleter {
 
 
 
-            } else if (args[0].equalsIgnoreCase("CreateMob")) {
+            } else if (args[0].equalsIgnoreCase("SpawnMob")) {
                 // Handle another subcommand
                 if (!player.isOp()) {
                     player.sendMessage("§cYou do not have permission to use this command!");
                     return false;
                 }
-                if (args.length == 10) {
-                    player.sendMessage("§aCreating mob...");
-                    String mobType = args[1];
-                    double hp = Double.parseDouble(args[2]);
-                    double dmg = Double.parseDouble(args[3]);
-                    double spd = Double.parseDouble(args[4]);
-                    ItemStack helm = new ItemStack(Material.getMaterial(args[5].toUpperCase()));
-                    ItemStack Cp = new ItemStack(Material.getMaterial(args[6].toUpperCase()));
-                    ItemStack Leg = new ItemStack(Material.getMaterial(args[7].toUpperCase()));
-                    ItemStack Boot = new ItemStack(Material.getMaterial(args[8].toUpperCase()));
-                    ItemStack MainHand = new ItemStack(Material.getMaterial(args[9].toUpperCase()));
-                    ItemStack OffHand = new ItemStack(Material.AIR); // Assuming offhand is always empty
+                if (args.length == 2) {
+                    String ID = args[1];
 
-                    Creature mob = (Creature) player.getWorld().spawnEntity(player.getLocation(), EntityType.valueOf(mobType.toUpperCase()));
-                    MobCreator.MobCreator(mob, hp, dmg, spd, Cp, Leg, Boot, helm, MainHand, OffHand);
 
 
                     player.sendMessage("§aMob created!");
