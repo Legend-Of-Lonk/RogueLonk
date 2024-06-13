@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="RogueLonk:jar">
+    <output-path>$PROJECT_DIR$/../../../RogueLonk/Server/plugins</output-path>
+    <root id="archive" name="RogueLonk.jar">
+      <element id="module-output" name="RogueLonk" />
+    </root>
+  </artifact>
+</component>
