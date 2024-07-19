@@ -1,6 +1,8 @@
 package org.Lonk.Commands;
 
 import org.Lonk.Items.ItemCreator;
+import org.Lonk.Items.ItemManager;
+import org.Lonk.Mobs.MobCreator;
 import org.Lonk.RogueLonk;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -8,6 +10,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -60,7 +63,7 @@ public class MainCommand implements CommandExecutor, TabCompleter {
                     Boolean unbreakable = Boolean.parseBoolean(args[8]);
                     String ID = args[9];
 
-                    ItemStack newItem = createItem(ID ,item.getType(), dmg, hp, spd, armor, name, lore, enchGlint, unbreakable);
+                    ItemStack newItem = createItem(ID ,item.getType(), dmg, hp, spd, armor, name, lore, enchGlint, unbreakable, " ");
 
 
                     player.sendMessage("§aItem created!");
@@ -80,6 +83,13 @@ public class MainCommand implements CommandExecutor, TabCompleter {
                 }
                 if (args.length == 2) {
                     String ID = args[1];
+                    LivingEntity mob = plugin.loadMobById(ID, player.getLocation());
+                    if (mob != null) {
+                        mob.teleport(player.getLocation());
+                        player.sendMessage("§aMob spawned!");
+                    } else {
+                        player.sendMessage("§cMob not found!");
+                    }
 
 
 
@@ -111,7 +121,7 @@ public class MainCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return List.of("createitem", "createmob", "giveitem");
+            return List.of("createitem", "createmob", "giveitem", "spawnmob");
         } else if (args.length > 1 && args[0].equalsIgnoreCase("createitem")) {
             if (args.length == 2) {
                 return List.of("<Name>"); // default name
@@ -145,6 +155,10 @@ public class MainCommand implements CommandExecutor, TabCompleter {
         }else if (args.length > 1 && args[0].equalsIgnoreCase("giveitem")) {
             if (args.length == 2) {
                 return ItemCreator.getAllItemIDs();
+            }
+        } else if (args.length > 1 && args[0].equalsIgnoreCase("spawnmob")) {
+            if (args.length == 2) {
+                return MobCreator.getAllMobIDs();
             }
         }
 

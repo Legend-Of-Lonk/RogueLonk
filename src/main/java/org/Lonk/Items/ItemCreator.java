@@ -1,9 +1,11 @@
 package org.Lonk.Items;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
 import org.Lonk.RogueLonk;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -14,6 +16,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
@@ -27,8 +30,23 @@ public class ItemCreator {
         FileConfiguration itemsConfig = RogueLonk.getPlugin(RogueLonk.class).getItemsConfig();
         return new ArrayList<>(itemsConfig.getKeys(false));
     }
-    public static ItemStack createItem(String ID,Material mat, double dmg, double hp, double spd, double armor, String name, String lore, Boolean enchGlint, Boolean unbreakable) {
+
+    public static void setToBeam(ItemStack item, Particle particle) {
+
+    }
+    public static ItemStack createItem(String ID, Material mat, double dmg, double hp, double spd, double armor, String name, String lore, Boolean enchGlint, Boolean unbreakable, String textureValue) {
         RogueLonk plugin = JavaPlugin.getPlugin(RogueLonk.class);
+
+        if (getAllItemIDs().contains(ID)) {
+            ItemStack existingItem= plugin.loadItemsByID(ID);
+            if (existingItem != null) {
+                Bukkit.getServer().getConsoleSender().sendMessage("§c<[!!!WARNING-ROGUELONK!!!]> Item with ID " + ID + " already exists!");
+                return existingItem;
+            }
+
+        }
+
+
         // Create item
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
@@ -79,6 +97,13 @@ public class ItemCreator {
         NamespacedKey unbreakableKey = new NamespacedKey("roguelonk", "unbreakable");
         meta.getPersistentDataContainer().set(unbreakableKey, PersistentDataType.BOOLEAN, unbreakable);
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+
+
+        if (mat == Material.PLAYER_HEAD) {
+            NamespacedKey textureKey = new NamespacedKey("roguelonk", "texture");
+            meta.getPersistentDataContainer().set(textureKey, PersistentDataType.STRING, textureValue);
+        }
+
         item.setItemMeta(meta);
         plugin.saveItem(ID, item);
         return item;

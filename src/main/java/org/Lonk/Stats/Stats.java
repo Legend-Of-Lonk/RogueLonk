@@ -29,7 +29,6 @@ public class Stats implements Listener {
             ItemStack OffHand = player.getInventory().getItemInOffHand();
 
 
-
             // DMG
             Double MainHandDmg = 0.0;
             Double OffHandDmg = 0.0;
@@ -78,20 +77,47 @@ public class Stats implements Listener {
             }
 
 
-
-
-
             Double FinalDmg = MainHandDmg + OffHandDmg + ChestplateDmg + LeggingsDmg + BootsDmg + HelmetDmg;
             event.setDamage(FinalDmg);
+
+
+        }
+        if (event.getEntity() instanceof Player) {
+            Player player = (Player) event.getEntity();
+            //Armor
+            Double totalArmor = 0.0;
+            ItemStack[] equippedItems = new ItemStack[]{
+                    player.getInventory().getHelmet(),
+                    player.getInventory().getChestplate(),
+                    player.getInventory().getLeggings(),
+                    player.getInventory().getBoots(),
+                    player.getInventory().getItemInMainHand(),
+                    player.getInventory().getItemInOffHand()
+            };
+            for (ItemStack item : equippedItems) {
+                if (item != null && item.getItemMeta() != null) {
+                    NamespacedKey armorKey = new NamespacedKey("roguelonk", "armor");
+                    if (item.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
+                        totalArmor += item.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                    }
+                }
+            }
+            double constant = 100.0;
+            double maxDamageReduction = 0.9; // 90% cap
+            double damageReduction = Math.min(totalArmor / (totalArmor + constant), maxDamageReduction);
+            double finalDamage = event.getDamage() * (1 - damageReduction);
+            event.setDamage(finalDamage);
+
 
 
 
         }
     }
-
-
-
-
-
-
 }
+
+
+
+
+
+
+
