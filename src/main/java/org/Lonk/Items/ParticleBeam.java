@@ -89,7 +89,7 @@ public class ParticleBeam {
 
                 // Check for entities near this particle and damage them
                 for (Entity entity : world.getNearbyEntities(point, BEAM_RADIUS, BEAM_RADIUS, BEAM_RADIUS)) {
-                    if (entity instanceof LivingEntity && !(entity instanceof Player)) {
+                    if (entity instanceof LivingEntity && !(entity == player)) {
                         ((LivingEntity) entity).damage(BEAM_DAMAGE, player);
                     }
                 }

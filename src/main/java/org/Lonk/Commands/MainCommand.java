@@ -1,8 +1,8 @@
 package org.Lonk.Commands;
 
 import org.Lonk.Items.ItemCreator;
-import org.Lonk.Items.ItemManager;
 import org.Lonk.Mobs.MobCreator;
+import org.Lonk.NPC.npcCreator;
 import org.Lonk.RogueLonk;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -12,6 +12,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
@@ -26,7 +27,7 @@ public class MainCommand implements CommandExecutor, TabCompleter {
     RogueLonk plugin = JavaPlugin.getPlugin(RogueLonk.class);
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (command.getName().equalsIgnoreCase("RLP")){
+        if (command.getName().equalsIgnoreCase("RLP")) {
             if (!(sender instanceof Player)) {
                 sender.sendMessage("§cYou must be a player to use this command!");
                 return false;
@@ -63,7 +64,7 @@ public class MainCommand implements CommandExecutor, TabCompleter {
                     Boolean unbreakable = Boolean.parseBoolean(args[8]);
                     String ID = args[9];
 
-                    ItemStack newItem = createItem(ID ,item.getType(), dmg, hp, spd, armor, name, lore, enchGlint, unbreakable, " ");
+                    ItemStack newItem = createItem(ID, item.getType(), dmg, hp, spd, armor, name, lore, enchGlint, unbreakable, " ", EquipmentSlot.HAND, Boolean.TRUE);
 
 
                     player.sendMessage("§aItem created!");
@@ -72,7 +73,6 @@ public class MainCommand implements CommandExecutor, TabCompleter {
                 } else {
                     sender.sendMessage("§cInvalid arguments! Usage: /RogueLonk createitem <name> <dmg> <hp> <spd> <armor> <lore> <enchGlint> <unbreakable>");
                 }
-
 
 
             } else if (args[0].equalsIgnoreCase("SpawnMob")) {
@@ -92,22 +92,36 @@ public class MainCommand implements CommandExecutor, TabCompleter {
                     }
 
 
-
                     player.sendMessage("§aMob created!");
                 }
-            }else if (args[0].equalsIgnoreCase("GiveItem")) {
-                    if (args.length == 2) {
+            } else if (args[0].equalsIgnoreCase("SpawnNpc")) {
+
+                if (!player.isOp()) {
+                    player.sendMessage("§cYou do not have permission to use this command!");
+                    return false;
+                }
+                if (args.length == 2) {
+                    String ID = args[1];
+                    LivingEntity npc = plugin.loadNPCbyID(ID, player.getLocation());
+                    if (npc != null) {
+                        npc.teleport(player.getLocation());
+                        player.sendMessage("§aNPC spawned!");
+                    } else {
+                        player.sendMessage("§cNPC not found!");
+                    }
+                }
+
+            } else if (args[0].equalsIgnoreCase("GiveItem")) {
+                if (args.length == 2) {
                         String ID = args[1];
                         ItemStack item = plugin.loadItemsByID(ID);
                         player.getInventory().addItem(item);
 
 
-                    } else {
-                        sender.sendMessage("§cInvalid arguments! Usage: /RogueLonk GiveItem <ID>");
-                    }
                 } else {
-                    sender.sendMessage("§cInvalid arguments! Usage: /RogueLonk CreateMob <mobType> <hp> <dmg> <spd> <helm> <Cp> <Leg> <Boot> <MainHand>");
+                    sender.sendMessage("§cInvalid arguments! Usage: /RogueLonk GiveItem <ID>");
                 }
+            }
 
 
             } else {
@@ -115,13 +129,14 @@ public class MainCommand implements CommandExecutor, TabCompleter {
             }
 
 
-        return true;
-    }
+            return false;
+        }
+
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return List.of("createitem", "createmob", "giveitem", "spawnmob");
+            return List.of("createitem", "createmob", "giveitem", "spawnmob", "spawnnpc");
         } else if (args.length > 1 && args[0].equalsIgnoreCase("createitem")) {
             if (args.length == 2) {
                 return List.of("<Name>"); // default name
@@ -156,6 +171,11 @@ public class MainCommand implements CommandExecutor, TabCompleter {
             if (args.length == 2) {
                 return ItemCreator.getAllItemIDs();
             }
+        } else if (args.length > 1 && args[0].equalsIgnoreCase("spawnnpc")) {
+            if (args.length == 2) {
+                return npcCreator.getAllNPCIDs();
+            }
+
         } else if (args.length > 1 && args[0].equalsIgnoreCase("spawnmob")) {
             if (args.length == 2) {
                 return MobCreator.getAllMobIDs();

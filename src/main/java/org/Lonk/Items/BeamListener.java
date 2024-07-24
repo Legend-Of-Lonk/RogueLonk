@@ -1,23 +1,22 @@
 package org.Lonk.Items;
 
 import org.bukkit.Color;
-import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
-import org.yaml.snakeyaml.events.Event;
 
 public class BeamListener implements @NotNull Listener {
     private static final NamespacedKey IDKEY = new NamespacedKey("roguelonk", "id");
     private static final NamespacedKey UseKey = new NamespacedKey("roguelonk", "usebeam");
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         ItemStack item = player.getInventory().getItemInMainHand();

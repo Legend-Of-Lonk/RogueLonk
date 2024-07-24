@@ -29,7 +29,7 @@ public class CustomSkullCreator {
         ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) skull.getItemMeta();
 
-        PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID());
+        PlayerProfile profile = Bukkit.createProfile(UUID.fromString("0baa3381-bfc7-463b-ae25-9d9818a61d2d"));
         PlayerTextures textures = profile.getTextures();
 
         try {
@@ -81,7 +81,7 @@ public class CustomSkullCreator {
 
         Skull skull = (Skull) block.getState();
 
-        PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID());
+        PlayerProfile profile = Bukkit.createProfile(UUID.fromString("0baa3381-bfc7-463b-ae25-9d9818a61d2d"));
         PlayerTextures textures = profile.getTextures();
 
         try {

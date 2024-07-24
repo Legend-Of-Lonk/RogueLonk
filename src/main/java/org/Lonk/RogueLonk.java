@@ -3,15 +3,18 @@ package org.Lonk;
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.destroystokyo.paper.profile.ProfileProperty;
 import me.libraryaddict.disguise.DisguiseAPI;
-import me.libraryaddict.disguise.disguisetypes.Disguise;
 import me.libraryaddict.disguise.disguisetypes.PlayerDisguise;
 import org.Lonk.Commands.MainCommand;
 import org.Lonk.Items.BeamListener;
 import org.Lonk.Items.CustomSkullCreator;
 import org.Lonk.Items.ItemManager;
 import org.Lonk.Items.ItemUpdater;
+import org.Lonk.Items.abils.lonkMurderSword;
 import org.Lonk.Mobs.Bosses.BossManager;
 import org.Lonk.Mobs.MobManager;
+import org.Lonk.NPC.events.LonkNPC;
+import org.Lonk.NPC.npcManager;
+import org.Lonk.Stats.DamageIndecator;
 import org.Lonk.Stats.Stats;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -25,22 +28,20 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 
 @SuppressWarnings({"all"})
@@ -61,17 +62,39 @@ public final class RogueLonk extends JavaPlugin {
         instance = this;
         createItemsConfig();
         createMobConfig();
+        createNpcConfig();
         getServer().getPluginManager().registerEvents(new BeamListener(), this);
         getServer().getPluginManager().registerEvents(new Stats(), this);
         getServer().getPluginManager().registerEvents(new ItemUpdater(), this);
+        getServer().getPluginManager().registerEvents(new LonkNPC(), this);
+        getServer().getPluginManager().registerEvents(new lonkMurderSword(), this);
+        getServer().getPluginManager().registerEvents(new DamageIndecator(), this);
         ItemManager.init();
         MobManager.innit();
         BossManager.init();
+        npcManager.init();
 
 
         getCommand("RLP").setExecutor(new MainCommand());
         Bukkit.getServer().getConsoleSender().sendMessage("§eRogueLonk has been enabled!");
         statUpdate(true);
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                UpdateDisguises();
+            }
+        }.runTaskLater(this, 60);
+
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                npcManager.makeNpcFacePlayer();
+
+            }
+        }.runTaskTimer(this, 0, 5);
+
     }
 
     public static RogueLonk getInstance() {
@@ -103,19 +126,96 @@ public final class RogueLonk extends JavaPlugin {
         return this.npcConfig;
     }
 
-    public static void saveNPC(String ID, LivingEntity entity) {
-        RogueLonk plugin = JavaPlugin.getPlugin(RogueLonk.class);
-        FileConfiguration npcConfig = plugin.getNpcConfig();
-        if (npcConfig != null) {
+    public void saveNPC(String ID, Creature entity) {
 
+        if (npcConfig != null) {
+            npcConfig.set(ID, ID);
+            npcConfig.set(ID + ".EntityType", entity.getType().toString());
+            npcConfig.set(ID + ".Name", entity.getCustomName());
+            npcConfig.set(ID + ".HP", entity.getHealth());
+            PersistentDataContainer pdc = entity.getPersistentDataContainer();
+            for (NamespacedKey key : pdc.getKeys()) {
+                if (pdc.has(key, PersistentDataType.DOUBLE)) {
+                    npcConfig.set(ID + ".Data" + "." + key.getKey(), pdc.get(key, PersistentDataType.DOUBLE));
+                } else if (pdc.has(key, PersistentDataType.STRING)) {
+                    npcConfig.set(ID + ".Data" + "." + key.getKey(), pdc.get(key, PersistentDataType.STRING));
+                } else if (pdc.has(key, PersistentDataType.BOOLEAN)) {
+                    npcConfig.set(ID + ".Data" + "." + key.getKey(), pdc.get(key, PersistentDataType.BOOLEAN));
+                } else if (pdc.has(key, PersistentDataType.INTEGER)) {
+                    npcConfig.set(ID + ".Data" + "." + key.getKey(), pdc.get(key, PersistentDataType.INTEGER));
+                }
+            }
+            try {
+                npcConfig.save(npcFile);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+
+            }
         }
+    }
+
+    public LivingEntity loadNPCbyID(String ID, Location loc) {
+        if (! npcConfig.contains(ID)) {
+            return null;
+        }
+        LivingEntity livingEntity = (LivingEntity) Bukkit.getServer().getWorlds().get(0).spawnEntity(loc, EntityType.valueOf(npcConfig.getString(ID + ".EntityType")));
+
+        livingEntity.setCustomName(npcConfig.getString(ID + ".Name"));
+        livingEntity.setCustomNameVisible(true);
+        livingEntity.setPersistent(true);
+        livingEntity.setRemoveWhenFarAway(false);
+        livingEntity.setAI(false);
+        livingEntity.setInvulnerable(true);
+        livingEntity.setCollidable(false);
+        livingEntity.setCanPickupItems(false);
+        livingEntity.setSilent(true);
+        livingEntity.setGlowing(false);
+        livingEntity.setGravity(false);
+        livingEntity.setSwimming(false);
+        livingEntity.setFireTicks(0);
+        livingEntity.setHealth(20);
+
+
+        PersistentDataContainer pdc = livingEntity.getPersistentDataContainer();
+        ConfigurationSection mobData = npcConfig.getConfigurationSection(ID + ".Data");
+        if (mobData != null) {
+            for (String key : mobData.getKeys(false)) {
+                NamespacedKey namespacedKey = new NamespacedKey("roguelonk", key);
+                if (mobData.isDouble(key)) {
+                    double value = mobData.getDouble(key);
+                    pdc.set(namespacedKey, PersistentDataType.DOUBLE, value);
+                } else if (mobData.isString(key)) {
+                    String value = mobData.getString(key);
+                    pdc.set(namespacedKey, PersistentDataType.STRING, value);
+                } else if (mobData.isBoolean(key)) {
+                    boolean value = mobData.getBoolean(key);
+                    pdc.set(namespacedKey, PersistentDataType.BOOLEAN, value);
+                } else if (mobData.isInt(key)) {
+                    int value = mobData.getInt(key);
+                    pdc.set(namespacedKey, PersistentDataType.INTEGER, value);
+                }
+
+
+            }
+        }
+        if (livingEntity.getPersistentDataContainer().has(new NamespacedKey("roguelonk","skin"), PersistentDataType.STRING)) {
+            disguise(livingEntity, livingEntity.getPersistentDataContainer().get(new NamespacedKey("roguelonk","skin"), PersistentDataType.STRING));
+        }
+
+
+        return livingEntity;
     }
 
 
     public static void UpdateDisguises() {
         for (Entity entity : Bukkit.getServer().getWorlds().get(0).getEntities()) {
             if (entity instanceof LivingEntity) {
-                disguise((LivingEntity) entity, entity.getCustomName());
+                NamespacedKey key = new NamespacedKey("roguelonk", "skin");
+                if (entity.getPersistentDataContainer().has(key, PersistentDataType.STRING)){
+                    disguise((LivingEntity) entity, entity.getPersistentDataContainer().get(key, PersistentDataType.STRING));
+                    Bukkit.getServer().getConsoleSender().sendMessage("§aDisguised " + entity.getType().toString() + " as " + entity.getPersistentDataContainer().get(key, PersistentDataType.STRING));
+                }
             }
         }
 
@@ -449,20 +549,21 @@ public final class RogueLonk extends JavaPlugin {
                 skullMeta.setUnbreakable(meta.isUnbreakable());
 
                 // Copy the PersistentDataContainer from 'meta' to 'skullMeta'
-                if (pdcSection != null) {
-                    for (String key : pdcSection.getKeys(false)) {
+                ConfigurationSection pdcSection2 = itemsConfig.getConfigurationSection(ID + ".PDCs");
+                if (pdcSection2 != null) {
+                    for (String key : pdcSection2.getKeys(false)) {
                         NamespacedKey namespacedKey = new NamespacedKey("roguelonk", key);
-                        if (pdcSection.isDouble(key)) {
-                            double value = pdcSection.getDouble(key);
+                        if (pdcSection2.isDouble(key)) {
+                            double value = pdcSection2.getDouble(key);
                             skullMeta.getPersistentDataContainer().set(namespacedKey, PersistentDataType.DOUBLE, value);
-                        } else if (pdcSection.isString(key)) {
-                            String value = pdcSection.getString(key);
+                        } else if (pdcSection2.isString(key)) {
+                            String value = pdcSection2.getString(key);
                             skullMeta.getPersistentDataContainer().set(namespacedKey, PersistentDataType.STRING, value);
-                        } else if (pdcSection.isBoolean(key)) {
-                            boolean value = pdcSection.getBoolean(key);
+                        } else if (pdcSection2.isBoolean(key)) {
+                            boolean value = pdcSection2.getBoolean(key);
                             skullMeta.getPersistentDataContainer().set(namespacedKey, PersistentDataType.BOOLEAN, value);
-                        } else if (pdcSection.isInt(key)) {
-                            int value = pdcSection.getInt(key);
+                        } else if (pdcSection2.isInt(key)) {
+                            int value = pdcSection2.getInt(key);
                             skullMeta.getPersistentDataContainer().set(namespacedKey, PersistentDataType.INTEGER, value);
                         }
                     }
@@ -474,8 +575,7 @@ public final class RogueLonk extends JavaPlugin {
                 skull.setItemMeta(skullMeta);
 
                 // Use the skull ItemStack
-                item = skull;
-                return item;
+                return skull;
             }
 
 
@@ -561,6 +661,9 @@ public final class RogueLonk extends JavaPlugin {
                     ItemStack Boots = player.getInventory().getBoots();
                     ItemStack MainHand = player.getInventory().getItemInMainHand();
                     ItemStack OffHand = player.getInventory().getItemInOffHand();
+                    NamespacedKey slotKey = new NamespacedKey("roguelonk", "slot");
+
+
 
                     //HP
                     Double MainHandHp = 0.0;
@@ -573,9 +676,11 @@ public final class RogueLonk extends JavaPlugin {
                     if (MainHand != null) {
                         NamespacedKey hpKey = new NamespacedKey("roguelonk", "hp");
                         if (MainHand.getItemMeta() != null) {
-                            if (MainHand.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null) {
-                                if (MainHand.getItemMeta().getPersistentDataContainer().has(hpKey, PersistentDataType.DOUBLE)) {
-                                    MainHandHp = MainHand.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                            if (MainHand.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null && MainHand.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (MainHand.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.HAND.toString())) {
+                                    if (MainHand.getItemMeta().getPersistentDataContainer().has(hpKey, PersistentDataType.DOUBLE)) {
+                                        MainHandHp = MainHand.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                                    }
                                 }
                             }
                         }
@@ -583,40 +688,60 @@ public final class RogueLonk extends JavaPlugin {
                     if (OffHand != null) {
                         NamespacedKey hpKey = new NamespacedKey("roguelonk", "hp");
                         if (OffHand.getItemMeta() != null) {
-                            if (OffHand.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null) {
-                                OffHandHp = OffHand.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                            if (OffHand.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null && OffHand.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (OffHand.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.OFF_HAND.toString())) {
+                                    if (OffHand.getItemMeta().getPersistentDataContainer().has(hpKey, PersistentDataType.DOUBLE)) {
+                                        OffHandHp = OffHand.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Chestplate != null) {
                         NamespacedKey hpKey = new NamespacedKey("roguelonk", "hp");
                         if (Chestplate.getItemMeta() != null) {
-                            if (Chestplate.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null) {
-                                ChestplateHp = Chestplate.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                            if (Chestplate.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null && Chestplate.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Chestplate.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.CHEST.toString())) {
+                                    if (Chestplate.getItemMeta().getPersistentDataContainer().has(hpKey, PersistentDataType.DOUBLE)) {
+                                        ChestplateHp = Chestplate.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Leggings != null) {
                         NamespacedKey hpKey = new NamespacedKey("roguelonk", "hp");
                         if (Leggings.getItemMeta() != null) {
-                            if (Leggings.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null) {
-                                LeggingsHp = Leggings.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                            if (Leggings.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null && Leggings.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Leggings.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.LEGS.toString())) {
+                                    if (Leggings.getItemMeta().getPersistentDataContainer().has(hpKey, PersistentDataType.DOUBLE)) {
+                                        LeggingsHp = Leggings.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Boots != null) {
                         NamespacedKey hpKey = new NamespacedKey("roguelonk", "hp");
                         if(Boots.getItemMeta() != null) {
-                            if (Boots.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null) {
-                                BootsDmgHp = Boots.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                            if (Boots.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null && Boots.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Boots.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.FEET.toString())) {
+                                    if (Boots.getItemMeta().getPersistentDataContainer().has(hpKey, PersistentDataType.DOUBLE)) {
+                                        BootsDmgHp = Boots.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Helmet != null) {
                         NamespacedKey hpKey = new NamespacedKey("roguelonk", "hp");
                         if (Helmet.getItemMeta() != null) {
-                            if (Helmet.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null) {
-                                HelmetDmgHp = Helmet.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                            if (Helmet.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE) != null && Helmet.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Helmet.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.HEAD.toString())) {
+                                    if (Helmet.getItemMeta().getPersistentDataContainer().has(hpKey, PersistentDataType.DOUBLE)) {
+                                        HelmetDmgHp = Helmet.getItemMeta().getPersistentDataContainer().get(hpKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
@@ -643,48 +768,72 @@ public final class RogueLonk extends JavaPlugin {
                     if (MainHand != null) {
                         NamespacedKey spdKey = new NamespacedKey("roguelonk", "spd");
                         if (MainHand.getItemMeta() != null) {
-                            if (MainHand.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
-                                MainHandSpd = MainHand.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                            if (MainHand.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE) && MainHand.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (MainHand.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.HAND.toString())) {
+                                    if (MainHand.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
+                                        MainHandSpd = MainHand.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (OffHand != null) {
                         NamespacedKey spdKey = new NamespacedKey("roguelonk", "spd");
                         if (OffHand.getItemMeta() != null) {
-                            if (OffHand.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)){
-                                OffHandSpd = OffHand.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                            if (OffHand.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE) && OffHand.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (OffHand.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.OFF_HAND.toString())) {
+                                    if (OffHand.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
+                                        OffHandSpd = OffHand.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Chestplate != null) {
                         NamespacedKey spdKey = new NamespacedKey("roguelonk", "spd");
                         if (Chestplate.getItemMeta() != null) {
-                            if (Chestplate.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
-                                ChestplateSpd = Chestplate.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                            if (Chestplate.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE) && Chestplate.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Chestplate.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.CHEST.toString())) {
+                                    if (Chestplate.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
+                                        ChestplateSpd = Chestplate.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Leggings != null) {
                         NamespacedKey spdKey = new NamespacedKey("roguelonk", "spd");
                         if (Leggings.getItemMeta() != null) {
-                            if (Leggings.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
-                                LeggingsSpd = Leggings.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                            if (Leggings.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE) && Leggings.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Leggings.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.LEGS.toString())) {
+                                    if (Leggings.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
+                                        LeggingsSpd = Leggings.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Boots != null) {
                         NamespacedKey spdKey = new NamespacedKey("roguelonk", "spd");
                         if (Boots.getItemMeta() != null) {
-                            if (Boots.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
-                                BootsDmgSpd = Boots.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                            if (Boots.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE) && Boots.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Boots.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.FEET.toString())) {
+                                    if (Boots.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
+                                        BootsDmgSpd = Boots.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Helmet != null) {
                         NamespacedKey spdKey = new NamespacedKey("roguelonk", "spd");
                         if (Helmet.getItemMeta() != null) {
-                            if (Helmet.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
-                                HelmetDmgSpd = Helmet.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                            if (Helmet.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE) && Helmet.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Helmet.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.HEAD.toString())) {
+                                    if (Helmet.getItemMeta().getPersistentDataContainer().has(spdKey, PersistentDataType.DOUBLE)) {
+                                        HelmetDmgSpd = Helmet.getItemMeta().getPersistentDataContainer().get(spdKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
@@ -722,49 +871,72 @@ public final class RogueLonk extends JavaPlugin {
                     if (MainHand != null) {
                         NamespacedKey dmgKey = new NamespacedKey("roguelonk", "dmg");
                         if (MainHand.getItemMeta() != null) {
-                            if (MainHand.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
-                                MainHandDmg = MainHand.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                            if (MainHand.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE) && MainHand.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (MainHand.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.HAND.toString())) {
+                                    if (MainHand.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
+                                        MainHandDmg = MainHand.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (OffHand != null) {
                         NamespacedKey dmgKey = new NamespacedKey("roguelonk", "dmg");
                         if (OffHand.getItemMeta() != null) {
-                            if (OffHand.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE))
-                            {
-                                OffHandDmg = OffHand.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                            if (OffHand.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE) && OffHand.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (OffHand.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.OFF_HAND.toString())) {
+                                    if (OffHand.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
+                                        OffHandDmg = OffHand.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Chestplate != null) {
                         NamespacedKey dmgKey = new NamespacedKey("roguelonk", "dmg");
                         if (Chestplate.getItemMeta() != null) {
-                            if (Chestplate.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
-                                ChestplateDmg = Chestplate.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                            if (Chestplate.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE) && Chestplate.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Chestplate.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.CHEST.toString())) {
+                                    if (Chestplate.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
+                                        ChestplateDmg = Chestplate.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Leggings != null) {
                         NamespacedKey dmgKey = new NamespacedKey("roguelonk", "dmg");
                         if (Leggings.getItemMeta() != null) {
-                            if (Leggings.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
-                                LeggingsDmg = Leggings.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                            if (Leggings.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE) && Leggings.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Leggings.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.LEGS.toString())) {
+                                    if (Leggings.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
+                                        LeggingsDmg = Leggings.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Boots != null) {
                         NamespacedKey dmgKey = new NamespacedKey("roguelonk", "dmg");
                         if (Boots.getItemMeta() != null) {
-                            if (Boots.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
-                                BootsDmg = Boots.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                            if (Boots.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE) && Boots.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Boots.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.FEET.toString())) {
+                                    if (Boots.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
+                                        BootsDmg = Boots.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Helmet != null) {
                         NamespacedKey dmgKey = new NamespacedKey("roguelonk", "dmg");
                         if (Helmet.getItemMeta() != null) {
-                            if (Helmet.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
-                                HelmetDmg = Helmet.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                            if (Helmet.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE) && Helmet.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Helmet.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.HEAD.toString())) {
+                                    if (Helmet.getItemMeta().getPersistentDataContainer().has(dmgKey, PersistentDataType.DOUBLE)) {
+                                        HelmetDmg = Helmet.getItemMeta().getPersistentDataContainer().get(dmgKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
@@ -784,48 +956,72 @@ public final class RogueLonk extends JavaPlugin {
                     if (MainHand != null) {
                         NamespacedKey armorKey = new NamespacedKey("roguelonk", "armor");
                         if (MainHand.getItemMeta() != null) {
-                            if (MainHand.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
-                                MainHandArmor = MainHand.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                            if (MainHand.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE) && MainHand.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (MainHand.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.HAND.toString())) {
+                                    if (MainHand.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
+                                        MainHandArmor = MainHand.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (OffHand != null) {
                         NamespacedKey armorKey = new NamespacedKey("roguelonk", "armor");
                         if (OffHand.getItemMeta() != null) {
-                            if (OffHand.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
-                                OffHandArmor = OffHand.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                            if (OffHand.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE) && OffHand.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (OffHand.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.OFF_HAND.toString())) {
+                                    if (OffHand.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
+                                        OffHandArmor = OffHand.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Chestplate != null) {
                         NamespacedKey armorKey = new NamespacedKey("roguelonk", "armor");
                         if (Chestplate.getItemMeta() != null) {
-                            if (Chestplate.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
-                                ChestplateArmor = Chestplate.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                            if (Chestplate.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE) && Chestplate.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Chestplate.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.CHEST.toString())) {
+                                    if (Chestplate.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
+                                        ChestplateArmor = Chestplate.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Leggings != null) {
                         NamespacedKey armorKey = new NamespacedKey("roguelonk", "armor");
                         if (Leggings.getItemMeta() != null) {
-                            if (Leggings.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
-                                LeggingsArmor = Leggings.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                            if (Leggings.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE) && Leggings.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Leggings.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.LEGS.toString())) {
+                                    if (Leggings.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
+                                        LeggingsArmor = Leggings.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Boots != null) {
                         NamespacedKey armorKey = new NamespacedKey("roguelonk", "armor");
                         if (Boots.getItemMeta() != null) {
-                            if (Boots.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
-                                BootsArmor = Boots.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                            if (Boots.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE) && Boots.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Boots.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.FEET.toString())) {
+                                    if (Boots.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
+                                        BootsArmor = Boots.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }
                     if (Helmet != null) {
                         NamespacedKey armorKey = new NamespacedKey("roguelonk", "armor");
                         if (Helmet.getItemMeta() != null) {
-                            if (Helmet.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
-                                HelmetArmor = Helmet.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                            if (Helmet.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE) && Helmet.getItemMeta().getPersistentDataContainer().has(slotKey, PersistentDataType.STRING)) {
+                                if (Helmet.getItemMeta().getPersistentDataContainer().get(slotKey, PersistentDataType.STRING).equals(EquipmentSlot.HEAD.toString())) {
+                                    if (Helmet.getItemMeta().getPersistentDataContainer().has(armorKey, PersistentDataType.DOUBLE)) {
+                                        HelmetArmor = Helmet.getItemMeta().getPersistentDataContainer().get(armorKey, PersistentDataType.DOUBLE);
+                                    }
+                                }
                             }
                         }
                     }

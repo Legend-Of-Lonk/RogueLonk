@@ -7,6 +7,7 @@ import org.bukkit.entity.Damageable;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.ItemStack;
@@ -15,8 +16,11 @@ import org.eclipse.sisu.launch.Main;
 
 public class Stats implements Listener {
 
-    @EventHandler
+
+
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerDamage(EntityDamageByEntityEvent event) {
+        /*
         // Code here
         if (event.getDamager() instanceof Player) {
             Player player = (Player) event.getDamager();
@@ -82,6 +86,7 @@ public class Stats implements Listener {
 
 
         }
+        */
         if (event.getEntity() instanceof Player) {
             Player player = (Player) event.getEntity();
             //Armor
