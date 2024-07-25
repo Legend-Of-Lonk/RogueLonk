@@ -1,6 +1,5 @@
 package org.Lonk.Items.abils;
 
-import org.Lonk.Items.ItemManager;
 import org.Lonk.RogueLonk;
 import org.bukkit.*;
 import org.bukkit.entity.Entity;
@@ -12,7 +11,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -20,49 +18,48 @@ import org.bukkit.util.Vector;
 
 import java.util.*;
 
-public class lonkMurderSword implements Listener {
+public class CustomAttackAnimation implements Listener {
     RogueLonk plugin = RogueLonk.getPlugin(RogueLonk.class);
 
     @EventHandler
     public void onPlayerInterract( PlayerInteractEvent event ) {
+
         if (event.getAction().equals(Action.LEFT_CLICK_AIR) || event.getAction().equals(Action.LEFT_CLICK_BLOCK)) {
             NamespacedKey IDKey = new NamespacedKey("roguelonk", "id");
+            Player player = event.getPlayer();
             if (event.getPlayer().getInventory().getItemInMainHand().getItemMeta().getPersistentDataContainer().has(IDKey, PersistentDataType.STRING)) {
 
                 event.setCancelled(true);
-                event.getPlayer().setMetadata("antiBezierDamageStack", new FixedMetadataValue(plugin, false));
+                event.getPlayer().setMetadata("antiBezierDamageStack", new FixedMetadataValue(plugin, true));
                 drawCurveAroundPlayer(event.getPlayer(), 2);
+                player.removeMetadata("antiBezierDamageStack", plugin);
+
+
             }
         }
     }
-    @EventHandler(priority = EventPriority.LOW)
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerDamage(EntityDamageByEntityEvent event) {
-        // Check if the event has already been cancelled
-        if (event.isCancelled()) {
-            return;
-        }
 
-        if (event.getDamager() instanceof Player) {
-            if (event.getDamager().getMetadata("antiBezierDamageStack").equals(false)) {
-                event.setCancelled(true);
-                event.getDamager().removeMetadata("antiBezierDamageStack", plugin);
-                return;
-            }
-        }
+
+
 
         if (event.getDamager() instanceof Player) {
             Player player = (Player) event.getDamager();
             NamespacedKey IDKey = new NamespacedKey("roguelonk", "id");
             if (player.getInventory().getItemInMainHand().getItemMeta().getPersistentDataContainer().has(IDKey, PersistentDataType.STRING)) {
-                if (player.hasMetadata("BezierCurveAttack")) {
-                    // Remove the metadata
-                    player.removeMetadata("BezierCurveAttack", plugin);
-                } else {
-                    // Cancel the regular attack
-                    event.setCancelled(true);
-                    // Trigger your Bezier curve attack
-                    player.setMetadata("BezierCurveAttack", new FixedMetadataValue(plugin, true));
-                    drawCurveAroundPlayer(player, 2);
+                if (! player.hasMetadata("antiBezierDamageStack")) {
+                    if (!player.hasMetadata("BezierCurveAttack")) {
+                        // set the metadata
+                        player.setMetadata("BezierCurveAttack", new FixedMetadataValue(plugin, true));
+
+                    } else {
+                        // Cancel the regular attack
+                        event.setCancelled(true);
+                        // Trigger your Bezier curve attack
+                        player.removeMetadata("BezierCurveAttack", plugin);
+                        drawCurveAroundPlayer(player, 2);
+                    }
                 }
             }
         }
@@ -113,10 +110,17 @@ public class lonkMurderSword implements Listener {
 
         HashMap<UUID, HashMap<String,Double>> playerData = plugin.getPlayerStats();
 
+        Particle.DustOptions dustOptions = new Particle.DustOptions(Color.RED, 1);
+
+        Bukkit.getServer().getWorlds().get(0).spawnParticle(Particle.REDSTONE, p0, 1, dustOptions);
+        Bukkit.getServer().getWorlds().get(0).spawnParticle(Particle.REDSTONE, p1, 1, dustOptions);
+        Bukkit.getServer().getWorlds().get(0).spawnParticle(Particle.REDSTONE, p2, 1, dustOptions);
+
         BezierCurveParticleAndDamage(player.getWorld(), p0, p1, p2, player,playerData.get(player.getUniqueId()).get("dmg"));
     }
 
-    public void BezierCurveParticleAndDamage(World world, Location p0, Location p1, Location p2,Player player, Double Damage) {HashSet<Entity> damagedEntities = new HashSet<>();
+    public void BezierCurveParticleAndDamage(World world, Location p0, Location p1, Location p2,Player player, Double Damage) {
+        HashSet<Entity> damagedEntities = new HashSet<>();
         for (double t = 0; t <= 1; t += 0.01) {
             Location particleLocation = calculateBezierPoint(t, p0, p1, p2);
             Particle.DustOptions dustOptions = new Particle.DustOptions(Color.RED, 1);
@@ -124,8 +128,10 @@ public class lonkMurderSword implements Listener {
             world.spawnParticle(Particle.DUST_COLOR_TRANSITION, particleLocation, 1, dustTransition);
 
             for (Entity entity : world.getNearbyEntities(particleLocation, 0.5, 0.5, 0.5)) {
-                if (entity instanceof LivingEntity && !(entity == player)) {
+                if (entity instanceof LivingEntity && !(entity == player) && !damagedEntities.contains(entity)) {
+
                     ((LivingEntity) entity).damage(Damage, player);
+                    damagedEntities.add(entity);
                 }
             }
         }

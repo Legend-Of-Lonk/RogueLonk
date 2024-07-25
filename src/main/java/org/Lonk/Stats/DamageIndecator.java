@@ -18,8 +18,11 @@ import java.util.concurrent.ThreadLocalRandom;
 public class DamageIndecator implements Listener {
     RogueLonk plugin = JavaPlugin.getPlugin(RogueLonk.class);
 
-    @EventHandler(priority = EventPriority.NORMAL)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntityDamage(EntityDamageEvent event) {
+
+        if (event.isCancelled()) return;
+
         //get damage
         long damage = Math.round(event.getFinalDamage());
         String damageString = String.valueOf(damage);

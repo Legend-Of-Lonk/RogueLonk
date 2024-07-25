@@ -9,7 +9,7 @@ import org.Lonk.Items.BeamListener;
 import org.Lonk.Items.CustomSkullCreator;
 import org.Lonk.Items.ItemManager;
 import org.Lonk.Items.ItemUpdater;
-import org.Lonk.Items.abils.lonkMurderSword;
+import org.Lonk.Items.abils.CustomAttackAnimation;
 import org.Lonk.Mobs.Bosses.BossManager;
 import org.Lonk.Mobs.MobManager;
 import org.Lonk.NPC.events.LonkNPC;
@@ -67,7 +67,7 @@ public final class RogueLonk extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new Stats(), this);
         getServer().getPluginManager().registerEvents(new ItemUpdater(), this);
         getServer().getPluginManager().registerEvents(new LonkNPC(), this);
-        getServer().getPluginManager().registerEvents(new lonkMurderSword(), this);
+        getServer().getPluginManager().registerEvents(new CustomAttackAnimation(), this);
         getServer().getPluginManager().registerEvents(new DamageIndecator(), this);
         ItemManager.init();
         MobManager.innit();
